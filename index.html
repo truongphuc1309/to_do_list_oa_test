@@ -118,9 +118,6 @@
     .todo-item.done .todo-title {
       text-decoration: line-through;
       color: var(--muted);
-    }
-
-    .todo-item.done {
       opacity: 0.6;
     }
 
@@ -152,18 +149,27 @@
     const list = document.getElementById("todo-list");
     const emptyMessage = document.getElementById("empty-message");
 
+    function createId() {
+      // crypto.randomUUID() exists only in secure contexts (https or localhost).
+      if (crypto.randomUUID) {
+        return crypto.randomUUID();
+      }
+      return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    }
+
     function addTodo(title) {
       const trimmed = title.trim();
       if (trimmed === "") {
-        return;
+        return false;
       }
       todos.push({
-        id: crypto.randomUUID(),
+        id: createId(),
         title: trimmed,
         done: false,
         createdAt: Date.now(),
       });
       render();
+      return true;
     }
 
     function toggleTodo(id) {
@@ -185,12 +191,17 @@
     function createTodoItem(todo) {
       const item = document.createElement("li");
       item.className = todo.done ? "todo-item done" : "todo-item";
+      item.dataset.id = todo.id;
 
       const checkbox = document.createElement("input");
       checkbox.type = "checkbox";
       checkbox.checked = todo.done;
       checkbox.setAttribute("aria-label", `Mark "${todo.title}" as done`);
-      checkbox.addEventListener("change", () => toggleTodo(todo.id));
+      checkbox.addEventListener("change", () => {
+        toggleTodo(todo.id);
+        // render() rebuilds the list, so keep keyboard focus on the new checkbox.
+        list.querySelector(`[data-id="${todo.id}"] input[type="checkbox"]`).focus();
+      });
 
       const title = document.createElement("span");
       title.className = "todo-title";
@@ -201,7 +212,11 @@
       deleteButton.className = "delete-button";
       deleteButton.textContent = "Delete";
       deleteButton.setAttribute("aria-label", `Delete "${todo.title}"`);
-      deleteButton.addEventListener("click", () => removeTodo(todo.id));
+      deleteButton.addEventListener("click", () => {
+        removeTodo(todo.id);
+        // The deleted button is gone after render(), so move focus to the input.
+        input.focus();
+      });
 
       item.append(checkbox, title, deleteButton);
       return item;
@@ -214,8 +229,9 @@
 
     form.addEventListener("submit", (event) => {
       event.preventDefault();
-      addTodo(input.value);
-      input.value = "";
+      if (addTodo(input.value)) {
+        input.value = "";
+      }
       input.focus();
     });
 

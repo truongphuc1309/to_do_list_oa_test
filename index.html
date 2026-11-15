@@ -126,6 +126,38 @@
       color: var(--muted);
       padding: 24px 0;
     }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--gap);
+      margin-top: var(--gap);
+    }
+
+    .counter {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .filters {
+      display: flex;
+      gap: 6px;
+    }
+
+    .filter-button {
+      padding: 6px 10px;
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    .filter-button[aria-pressed="true"] {
+      background: var(--accent);
+      color: var(--accent-text);
+      border-color: var(--accent);
+    }
   </style>
 </head>
 <body>
@@ -139,6 +171,15 @@
 
     <ul class="todo-list" id="todo-list"></ul>
     <p class="empty-message" id="empty-message">Nothing to do yet</p>
+
+    <div class="toolbar">
+      <p class="counter" id="counter" aria-live="polite"></p>
+      <div class="filters" role="group" aria-label="Filter todos">
+        <button type="button" class="filter-button" data-filter="all" aria-pressed="true">All</button>
+        <button type="button" class="filter-button" data-filter="active" aria-pressed="false">Active</button>
+        <button type="button" class="filter-button" data-filter="completed" aria-pressed="false">Completed</button>
+      </div>
+    </div>
   </main>
 
   <script>
@@ -148,6 +189,14 @@
     const input = document.getElementById("todo-input");
     const list = document.getElementById("todo-list");
     const emptyMessage = document.getElementById("empty-message");
+    const counter = document.getElementById("counter");
+    const filterButtons = document.querySelectorAll("[data-filter]");
+    const emptyTexts = {
+      all: "Nothing to do yet",
+      active: "No active todos",
+      completed: "No completed todos",
+    };
+    let currentFilter = "all";
 
     function createId() {
       // crypto.randomUUID() exists only in secure contexts (https or localhost).
@@ -200,7 +249,9 @@
       checkbox.addEventListener("change", () => {
         toggleTodo(todo.id);
         // render() rebuilds the list, so keep keyboard focus on the new checkbox.
-        list.querySelector(`[data-id="${todo.id}"] input[type="checkbox"]`).focus();
+        // The filter may hide the todo now, so fall back to the input.
+        const checkboxAgain = list.querySelector(`[data-id="${todo.id}"] input[type="checkbox"]`);
+        (checkboxAgain ?? input).focus();
       });
 
       const title = document.createElement("span");
@@ -222,9 +273,39 @@
       return item;
     }
 
+    function visibleTodos() {
+      if (currentFilter === "active") {
+        return todos.filter((todo) => !todo.done);
+      }
+      if (currentFilter === "completed") {
+        return todos.filter((todo) => todo.done);
+      }
+      return todos;
+    }
+
+    function setFilter(filter) {
+      currentFilter = filter;
+      render();
+    }
+
+    function renderFilterButtons() {
+      filterButtons.forEach((button) => {
+        button.setAttribute("aria-pressed", String(button.dataset.filter === currentFilter));
+      });
+    }
+
+    function renderCounter() {
+      const left = todos.filter((todo) => !todo.done).length;
+      counter.textContent = `${left} ${left === 1 ? "item" : "items"} left`;
+    }
+
     function render() {
-      list.replaceChildren(...todos.map(createTodoItem));
-      emptyMessage.hidden = todos.length > 0;
+      const visible = visibleTodos();
+      list.replaceChildren(...visible.map(createTodoItem));
+      emptyMessage.textContent = emptyTexts[currentFilter];
+      emptyMessage.hidden = visible.length > 0;
+      renderFilterButtons();
+      renderCounter();
     }
 
     form.addEventListener("submit", (event) => {
@@ -233,6 +314,10 @@
         input.value = "";
       }
       input.focus();
+    });
+
+    filterButtons.forEach((button) => {
+      button.addEventListener("click", () => setFilter(button.dataset.filter));
     });
 
     render();
